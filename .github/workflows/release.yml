@@ -1,0 +1,42 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build binaries
+        run: |
+          GOOS=darwin GOARCH=arm64 go build -o dist/darwin-arm64/gh-aw-create .
+          GOOS=darwin GOARCH=amd64 go build -o dist/darwin-amd64/gh-aw-create .
+          GOOS=linux GOARCH=amd64 go build -o dist/linux-amd64/gh-aw-create .
+          GOOS=linux GOARCH=arm64 go build -o dist/linux-arm64/gh-aw-create .
+          GOOS=windows GOARCH=amd64 go build -o dist/windows-amd64/gh-aw-create.exe .
+
+      - name: Package
+        run: |
+          cd dist
+          for dir in */; do
+            os_arch="${dir%/}"
+            tar czf "gh-aw-create-${os_arch}.tar.gz" -C "$os_arch" .
+          done
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ github.ref_name }}" dist/*.tar.gz \
+            --title "${{ github.ref_name }}" \
+            --generate-notes
